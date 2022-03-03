@@ -1,0 +1,15 @@
+import pyupbit
+import pandas as pd
+
+ticker = "krw-btc"
+data = pyupbit.get_ohlcv(ticker, interval="minute60")
+closedata = data["close"]
+delta = closedata.diff()
+ups, downs = delta.copy(), delta.copy() 
+ups[ups < 0] = 0 
+downs[downs > 0] = 0 
+period = 25 
+au = ups.ewm(com = period-1, min_periods = period).mean() 
+ad = downs.abs().ewm(com = period-1, min_periods = period).mean()
+rsi = au/(au+ad) * 100
+print(rsi.iloc[-1])
