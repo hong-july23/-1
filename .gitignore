@@ -3,10 +3,38 @@ import pyupbit
 import datetime
 import pandas as pd
 
-access = "your-access"                   #업비트 api 키
-secret = "your-secret"                   #업비트 시크릿 키
-k = 0.2                         #k값
+access = "your-access"                   #<<<<<<----- 업비트 api 키
+secret = "your-secret"                   #<<<<<<----- 업비트 시크릿 키
+k = 0.2                                  #<<<<<<----- k값
 switch = 0
+
+def get_coin():
+    data = []
+    coin = []
+    cryptoc = pyupbit.get_tickers(fiat="KRW")
+    a = 0
+    while a < 110:
+        df = pyupbit.get_ohlcv(cryptoc[a], interval = "day", count = 12)
+        ma = df['close'].rolling(window=10).mean()
+        v = df.iloc[-1]['volume'] * ma.iloc[-1]
+        data.append(v)
+        a = a + 1
+        time.sleep(0.1)
+    data.sort()
+    middle = int(data[50])
+
+    cryptoc = pyupbit.get_tickers(fiat="KRW")
+    a = 0
+    while a < 110:
+        df = pyupbit.get_ohlcv(cryptoc[a], interval = "day", count = 12)
+        ma = df['close'].rolling(window=10).mean()
+        k = int(df.iloc[-1]['volume'])
+        p = int(ma.iloc[-1])
+        if k * p > middle:
+            coin.append(cryptoc[a])
+        a = a + 1
+        time.sleep(0.1)
+    return coin
 
 def get_ticker():
     cryptoc = pyupbit.get_tickers(fiat="KRW")
@@ -26,7 +54,7 @@ def get_ticker():
                 a = a - 110
                 print("looking for crypto currency to buy...")
         except Exception as e:
-            time.sleep(0.1)
+            time.sleep(0.02)
     return ticker
 
 def get_ws(ticker):
@@ -133,10 +161,10 @@ while True:
         
         elif now > end_time - datetime.timedelta(minutes=10):
             btc = upbit.get_balance(ticker)
+            coin = get_coin()
             if btc > 0 and switch == 1:
                 upbit.sell_market_order(ticker, btc * 0.9995)
             switch = 0
-        
         time.sleep(1)
     except Exception as e:
         print(e)
