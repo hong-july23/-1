@@ -1,0 +1,12 @@
+import pyupbit
+import numpy as np
+
+df = pyupbit.get_ohlcv("KRW-btg", interval = "minute15", count = 500)
+ma4 = df['close'].rolling(window=4).mean()
+ma96 = df['close'].rolling(window=96).mean()
+
+df['soma'] = ma4 - ma96
+df['masa'] = df['soma'].rolling(window=48).mean()
+df['dd'] = df['soma']/df['masa']
+
+df.to_excel("dd.xlsx")
