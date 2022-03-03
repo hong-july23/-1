@@ -1,0 +1,11 @@
+import pyupbit
+import pandas as pd
+
+access = "input your access"    #업비트 api 키 입력란
+secret = "input your secret"     #업비트 시크릿 키 입력란
+
+upbit = pyupbit.Upbit(access, secret)           #로그인 시작
+print("autotrade start")
+
+total = upbit.get_balance("KRW")
+print(total)
