@@ -1,0 +1,22 @@
+import pyupbit
+
+def get_ws2(ticker):
+    a = []
+    i = 0
+    df = pyupbit.get_ohlcv(ticker, interval = "day")
+    ma30 = df['close'].rolling(window=30).mean()
+    ma60 = df['close'].rolling(window=60).mean()
+    ma120 = df['close'].rolling(window=120).mean()
+    ma180 = df['close'].rolling(window=180).mean()
+    ma360 = df['close'].rolling(window=360).mean()
+    yes = [ma30.iloc[-1],ma60.iloc[-1],ma120.iloc[-1],ma180.iloc[-1],ma360.iloc[-1]]
+    standard = df.iloc[-1]['open'] * 1.1
+    for g in yes:
+        if g > standard:
+            a.insert(i, g)
+            i = i + 1
+    ws2 = min(a)
+    return ws2
+ticker = "krw-btc"
+gap = get_ws2(ticker)
+print(gap)
