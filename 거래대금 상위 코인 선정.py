@@ -1,32 +1,27 @@
-import pyupbit
 import time
+import pyupbit
+import datetime
 import pandas as pd
 
-def get_coin():
-    data = []
-    coin = []
-    cryptoc = pyupbit.get_tickers(fiat="KRW")
-    a = 0
-    while a < 110:
-        df = pyupbit.get_ohlcv(cryptoc[a], interval = "day", count = 12)
-        ma = df['close'].rolling(window=10).mean()
-        v = df.iloc[-1]['volume'] * ma.iloc[-1]
-        data.append(v)
-        a = a + 1
-        time.sleep(0.1)
-    data.sort()
-    middle = int(data[50])
-
-    cryptoc = pyupbit.get_tickers(fiat="KRW")
-    a = 0
-    while a < 110:
-        df = pyupbit.get_ohlcv(cryptoc[a], interval = "day", count = 12)
-        ma = df['close'].rolling(window=10).mean()
-        k = int(df.iloc[-1]['volume'])
-        p = int(ma.iloc[-1])
-        if k * p > middle:
-            coin.append(cryptoc[a])
-        a = a + 1
-        time.sleep(0.1)
-    return coin
-coin = get_coin()
+print(datetime.datetime.now())
+data = []
+coin = []
+cryptoc = pyupbit.get_tickers(fiat="KRW")
+a = 0
+while a < 111:
+    df = pyupbit.get_ohlcv(cryptoc[a], interval = "day", count=1)
+    v = df.iloc[-1]['value']/1000000
+    data.append(v)
+    time.sleep(0.05)
+    a = a + 1
+data.sort()
+a = 0
+while a < 111:
+    df = pyupbit.get_ohlcv(cryptoc[a], interval = "day", count=1)
+    if int(data[60]) < int(df.iloc[-1]['value']/1000000):
+        coin.append(cryptoc[a])
+    time.sleep(0.05)
+    a = a + 1
+print(coin)
+print(len(coin))
+print(datetime.datetime.now())
