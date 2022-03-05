@@ -1,0 +1,49 @@
+import datetime
+import numpy as np
+import pandas as pd
+import pyupbit
+import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
+
+ticker = "krw-btc" <<<<원하는 코인으로 변경
+count_lenth = 5000 <<<조회할 캔들 개수 250개당 1초 걸림
+next = 50          <<<예측할 캔들 개수
+interday = "minute240" <<<원하는 캔들 
+
+print(datetime.datetime.now())
+long = pyupbit.get_ohlcv(ticker, interval = interday, count = count_lenth)
+data = pyupbit.get_ohlcv(ticker, interval = interday, count = next)
+close = data['close']
+
+base = (close - np.min(close)) / (np.max(close) - np.min(close))
+w = len(base)
+move = len(long) - w - next - 1
+
+sim = []
+
+for i in range(move):
+    t = long.iloc[i:i+w]['close']
+    base2 = (t - np.min(t)) / (np.max(t) - np.min(t))
+    a = np.dot(base, base2) / (np.sqrt(np.dot(base ,base)) * np.sqrt(np.dot(base2, base2)))
+    sim.append(a)
+
+ser = pd.Series(sim).sort_values(ascending = False).head(5)
+print(ser)
+print(datetime.datetime.now())
+
+i = int(input())
+ti = long.iloc[i:i+w+next]['close']
+ti = (ti - ti.min()) / (ti.max() - ti.min())
+
+j = int(input())
+tj = long.iloc[j:j+w+next]['close']
+tj = (tj - tj.min()) / (tj.max() - tj.min())
+
+plt.plot(base.values, label = 'present', color = 'k')
+plt.plot(ti.values, label = 'future', color = 'g')
+plt.plot(tj.values, label = 'future2', color = 'b')
+plt.xticks(np.arange(len(ti)), list(ti.index.strftime('%y-%m-%d')), rotation=45)
+plt.axvline(x=len(base)-1, c='grey', linestyle='--')
+plt.axvspan(len(base.values)-1, len(ti.values)-1, facecolor='ivory',alpha=0.7)
+plt.legend()
+plt.show()
