@@ -13,3 +13,15 @@ https://www.anaconda.com/products/individual#download-section
 
 https://code.visualstudio.com/
 visual studio code 설치경로
+
+***install python file***
+
+cd %systemdrive%\users\%username%\desktop
+
+pyinstaller -w --icon=btc.ico zzzzz.py
+
+pyinstaller -w -F --icon=btc.ico zzzzz.py
+
+pyinstaller -w -F zzzzz.py
+
+pyinstaller -w final.py
