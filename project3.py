@@ -6,9 +6,10 @@ import numpy as np
 import plotly.graph_objects as go
 import plotly.subplots as ms
 
+record_time = datetime.today()
+
 binance = ccxt.binance()
-result = pd.DataFrame(
-columns=['datetime', 'open', 'high', 'low', 'close', 'volume'])
+result = pd.DataFrame(columns=['datetime', 'open', 'high', 'low', 'close', 'volume'])
 
 counta = 0
 num = 1
@@ -24,9 +25,7 @@ while x > 0:
     x = x-1
     result = pd.concat([result, data])
 
-print("$$$")
-
-# ?뚯씠???쒓컙 +9 = ?곕━?섎씪 ?쒓컙
+# python time + 9
 result = result.drop(['datetime'], axis='columns')
 
 btc_ohlcv = binance.fetch_ohlcv(symbol="BTC/USDT", timeframe="1h", limit=101)
@@ -50,6 +49,7 @@ for i in range(move):
 
 ser = pd.Series(sim).sort_values(ascending=False).head(5)
 
+print(datetime.today()-record_time)
 while counta < 3:
     i = ser.index[counta]
     chart = result.iloc[i:i+200]
@@ -57,8 +57,6 @@ while counta < 3:
     gap = com.iloc[-2]['close']/chart.iloc[100]['open']
     chart = chart * gap
     chart['volume'] = chart['volume'] / gap
-
-    print("$$$")
 
     def get_chart(c):
         ta[0:100] = com[c]
