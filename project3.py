@@ -84,4 +84,5 @@ while counta < 3:
     fig.update_yaxes(zeroline=True, zerolinewidth=1, zerolinecolor='black', showgrid=True, gridwidth=2, gridcolor='lightgray', showline=True, linewidth=2, linecolor='black', mirror=True)
     fig.show()
     counta = counta + 1
-    time.sleep(1)
+    print("$$$")
+    time.sleep(3)
