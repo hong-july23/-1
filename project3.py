@@ -1,0 +1,89 @@
+import ccxt
+import time
+from datetime import datetime, timedelta
+import pandas as pd
+import numpy as np
+import plotly.graph_objects as go
+import plotly.subplots as ms
+
+binance = ccxt.binance()
+result = pd.DataFrame(
+columns=['datetime', 'open', 'high', 'low', 'close', 'volume'])
+
+counta = 0
+num = 1
+x = 25
+while x > 0:
+    now = datetime.today() - timedelta(hours=1000*x)
+    since = round(now.timestamp()*1000)
+
+    btc = binance.fetch_ohlcv(symbol="BTC/USDT", timeframe="1h", since=since, limit=1000)
+    data = pd.DataFrame(btc, columns=['datetime', 'open', 'high', 'low', 'close', 'volume'])
+    data['datetime'] = pd.to_datetime(data['datetime'], unit='ms')
+    data.set_index('datetime', inplace=True)
+    x = x-1
+    result = pd.concat([result, data])
+
+print("$$$")
+
+# ?뚯씠???쒓컙 +9 = ?곕━?섎씪 ?쒓컙
+result = result.drop(['datetime'], axis='columns')
+
+btc_ohlcv = binance.fetch_ohlcv(symbol="BTC/USDT", timeframe="1h", limit=101)
+com = pd.DataFrame(btc_ohlcv, columns=['datetime', 'open', 'high', 'low', 'close', 'volume'])
+com['datetime'] = pd.to_datetime(com['datetime'], unit='ms')
+com.set_index('datetime', inplace=True)
+close = com['close']
+close = close[:100]
+
+base = (close - np.min(close)) / (np.max(close) - np.min(close))
+w = len(base)
+move = len(result) - w - 101
+sim = []
+for i in range(move):
+    t = result.iloc[i:i+w]['close']
+    base2 = (t - np.min(t)) / (np.max(t) - np.min(t))
+    a = np.dot(base, base2) / (np.sqrt(np.dot(base, base)) * np.sqrt(np.dot(base2, base2)))
+    sim.append(a)
+    print("analyzing", num/250, "%")
+    num = num + 1
+
+ser = pd.Series(sim).sort_values(ascending=False).head(5)
+
+while counta < 3:
+    i = ser.index[counta]
+    chart = result.iloc[i:i+200]
+    ta = []
+    gap = com.iloc[-2]['close']/chart.iloc[100]['open']
+    chart = chart * gap
+    chart['volume'] = chart['volume'] / gap
+
+    print("$$$")
+
+    def get_chart(c):
+        ta[0:100] = com[c]
+        ta[100:] = chart.iloc[100:][c]
+        chart[c] = ta
+        return chart
+
+    get_chart("close")
+    get_chart("open")
+    get_chart("high")
+    get_chart("low")
+    get_chart("volume")
+
+    df = chart
+    df = df[25:]
+
+    candle = go.Candlestick(open=df['open'], high=df['high'], low=df['low'], close=df['close'], increasing_line_color = 'green', decreasing_line_color = 'red', showlegend=False)
+    volume = go.Bar(y=df['volume'], marker_color='red', name='volume', showlegend=False)
+    fig = ms.make_subplots(rows=4, cols=1, specs=[[{'rowspan': 3}], [None],[None],[{}]], shared_xaxes=True, horizontal_spacing=0.03, vertical_spacing=0.01)
+    fig.add_trace(candle, row=1, col=1)
+    fig.add_trace(volume, row=4, col=1)
+    fig.update_layout(shapes=[dict(x0=75, x1=75, y0=0, y1=1, xref='x',yref='paper',line_width=1)],annotations=[dict(x=22,y=1,xref='x',yref='paper',font=dict(color="black",size=30),showarrow=False,xanchor='left',text='<--present : future-->')])
+    fig.update_layout(autosize=True, xaxis1_rangeslider_visible=False, xaxis2_rangeslider_visible=False, margin=dict(l=50, r=50, t=50, b=50), template='seaborn', title='BTC in next 100 hours - HongSeunguk')
+    fig.update_xaxes(zeroline=True, zerolinewidth=1, zerolinecolor='black', showgrid=True, gridwidth=2, gridcolor='lightgray', showline=True, linewidth=2, linecolor='black', mirror=True)
+    fig.update_yaxes(zeroline=True, zerolinewidth=1, zerolinecolor='black', showgrid=True, gridwidth=2, gridcolor='lightgray', showline=True, linewidth=2, linecolor='black', mirror=True)
+    fig.show()
+    counta = counta + 1
+    time.sleep(1)
