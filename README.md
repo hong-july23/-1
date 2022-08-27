@@ -25,3 +25,7 @@ pyinstaller -w -F --icon=btc.ico zzzzz.py
 pyinstaller -w -F zzzzz.py
 
 pyinstaller -w final.py
+
+***starting python file***
+
+cd desktop/test-file >>> python test.py
