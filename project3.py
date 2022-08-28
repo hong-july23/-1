@@ -1,5 +1,4 @@
 import ccxt
-import time
 from datetime import datetime, timedelta
 import pandas as pd
 import numpy as np
@@ -47,11 +46,13 @@ for i in range(move):
     print("analyzing", num/250, "%")
     num = num + 1
 
-ser = pd.Series(sim).sort_values(ascending=False).head(5)
+ser = pd.Series(sim).sort_values(ascending=False).head(30)
 
 print(datetime.today()-record_time)
-while counta < 3:
+while True:
+    print(counta,"번째")
     i = ser.index[counta]
+    name = "정확도 예상 : " + str(round((ser.iloc[1]*100),3)) + "%"
     chart = result.iloc[i:i+200]
     ta = []
     gap = com.iloc[-2]['close']/chart.iloc[100]['open']
@@ -78,11 +79,17 @@ while counta < 3:
     fig = ms.make_subplots(rows=4, cols=1, specs=[[{'rowspan': 3}], [None],[None],[{}]], shared_xaxes=True, horizontal_spacing=0.03, vertical_spacing=0.01)
     fig.add_trace(candle, row=1, col=1)
     fig.add_trace(volume, row=4, col=1)
-    fig.update_layout(shapes=[dict(x0=75, x1=75, y0=0, y1=1, xref='x',yref='paper',line_width=1)],annotations=[dict(x=22,y=1,xref='x',yref='paper',font=dict(color="black",size=30),showarrow=False,xanchor='left',text='<--present : future-->')])
+    fig.update_layout(shapes=[dict(x0=75, x1=75, y0=0, y1=1, xref='x',yref='paper',line_width=1)],annotations=[dict(x=22,y=1,xref='x',yref='paper',font=dict(color="black",size=11),showarrow=False,xanchor='left',text=str(name))])
     fig.update_layout(autosize=True, xaxis1_rangeslider_visible=False, xaxis2_rangeslider_visible=False, margin=dict(l=50, r=50, t=50, b=50), template='seaborn', title='BTC in next 100 hours - HongSeunguk')
     fig.update_xaxes(zeroline=True, zerolinewidth=1, zerolinecolor='black', showgrid=True, gridwidth=2, gridcolor='lightgray', showline=True, linewidth=2, linecolor='black', mirror=True)
     fig.update_yaxes(zeroline=True, zerolinewidth=1, zerolinecolor='black', showgrid=True, gridwidth=2, gridcolor='lightgray', showline=True, linewidth=2, linecolor='black', mirror=True)
     fig.show()
     counta = counta + 1
-    print("$$$")
-    time.sleep(3)
+    y = input()
+    if y == "":
+        continue
+    elif counta == 20:
+        break
+    else:
+        break
+print("Exit")
