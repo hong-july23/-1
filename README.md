@@ -28,4 +28,4 @@ pyinstaller -w final.py
 
 ***starting python file***
 
-cd desktop/test-file >>> python test.py
+cd desktop/test >>> python test.py
