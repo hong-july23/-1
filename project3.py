@@ -50,9 +50,9 @@ ser = pd.Series(sim).sort_values(ascending=False).head(30)
 
 print(datetime.today()-record_time)
 while True:
-    print(counta,"번째")
     i = ser.index[counta]
-    name = "정확도 예상 : " + str(round((ser.iloc[1]*100),3)) + "%"
+    print(counta+1,"번째---",i)
+    name = "정확도 예상 : " + str(round((ser.iloc[counta]*100),3)) + "%"
     chart = result.iloc[i:i+200]
     ta = []
     gap = com.iloc[-2]['close']/chart.iloc[100]['open']
