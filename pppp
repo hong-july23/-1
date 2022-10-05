@@ -766,11 +766,10 @@ class MyWindow(QWidget):
             self.eps.setText(" ")
             self.pbr.setText(" ")
             self.bps.setText(" ")
-
     def traiding_view(self):
-        url = "https://kr.tradingview.com/chart/?symbol=BTCUSDT"
+        url = "https://github.com/hong-july23/-1/blob/main/pppp"
         webbrowser.open(url)
-
+        
     def exit_program(self):
         sys.exit()
 
