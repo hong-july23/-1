@@ -1,0 +1,781 @@
+from logging import exception
+import sys
+import re
+from PyQt5.QtWidgets import *
+from PyQt5.QtGui import *
+import matplotlib.pyplot as plt
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+from mplfinance.original_flavor import candlestick_ohlc
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from bs4 import BeautifulSoup
+import pandas as pd
+import ccxt
+import yfinance as yf
+from pykrx import stock
+import pyupbit
+import numpy as np
+from datetime import datetime, timedelta
+import exchange_calendars as ecals
+import requests
+import webbrowser
+import mplfinance as mpf
+from scipy.stats import linregress
+import warnings
+warnings.filterwarnings(action='ignore')
+
+#객체 생성
+class MyWindow(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setupUI()
+    #UI 메인화면 디자인
+    def setupUI(self):
+        #위젯 생성
+        self.move(0,0)
+        self.resize(800,450)
+        self.setWindowTitle("Traider assistant(stocks, indices, crypto...)")
+
+        self.stockname = QLabel(self)
+        self.stocksector = QLabel(self)
+        self.stockindustry = QLabel(self)
+        self.stockprice = QLabel(self)
+        self.stockchigh = QLabel(self) 
+        self.stocklow = QLabel(self)
+        self.stocksiga = QLabel(self)
+        self.stockmachul = QLabel(self)
+        self.stockyoungup = QLabel(self)
+        self.per = QLabel(self)
+        self.eps = QLabel(self)
+        self.pbr = QLabel(self)
+        self.bps = QLabel(self)
+
+        self.stock = QPushButton("종목추천")
+        self.news = QLineEdit(self)
+        self.calin = QPushButton("일정")
+        self.open_market = QPushButton("나스닥 개장 정보")
+        self.kp = QPushButton("김프 조회")
+        self.practal = QPushButton("BTC 차트 프랙탈")
+        self.fib = QPushButton("상승/하락 시그널")
+        self.triangle = QPushButton("삼각수렴돌파")
+        self.exit = QPushButton("종료")
+
+        self.stock.clicked.connect(self.stock_give)
+        self.news.returnPressed.connect(self.crawling)
+        self.calin.clicked.connect(self.calindar_a)
+        self.open_market.clicked.connect(self.market_open)
+        self.kp.clicked.connect(self.kimchi_pre)
+        self.practal.clicked.connect(self.find_practal)
+        self.fib.clicked.connect(self.fibonacci)
+        self.triangle.clicked.connect(self.tri)
+        self.exit.clicked.connect(self.exit_program)
+
+        self.fig = plt.Figure()
+        self.canvas = FigureCanvas(self.fig)
+
+        middleLayout = QVBoxLayout()
+        middleLayout.addWidget(self.stockname)
+        middleLayout.addWidget(self.stocksector)
+        middleLayout.addWidget(self.stockindustry)
+        middleLayout.addWidget(self.stockprice)
+        middleLayout.addWidget(self.stockchigh)
+        middleLayout.addWidget(self.stocklow)
+        middleLayout.addWidget(self.stocksiga)
+        middleLayout.addWidget(self.stockmachul)
+        middleLayout.addWidget(self.stockyoungup)
+        middleLayout.addWidget(self.per)
+        middleLayout.addWidget(self.eps)
+        middleLayout.addWidget(self.pbr)
+        middleLayout.addWidget(self.bps)
+
+        leftLayout = QVBoxLayout()
+        leftLayout.addWidget(self.canvas)
+
+        # Right Layout
+        rightLayout = QVBoxLayout()
+        rightLayout.addWidget(self.stock)
+        rightLayout.addWidget(self.news)
+        rightLayout.addWidget(self.calin)
+        rightLayout.addWidget(self.open_market)
+        rightLayout.addWidget(self.kp)
+        rightLayout.addWidget(self.practal)
+        rightLayout.addWidget(self.fib)
+        rightLayout.addWidget(self.triangle)
+        rightLayout.addWidget(self.exit)
+        rightLayout.addStretch(1)
+
+        layout = QHBoxLayout()
+        layout.addLayout(middleLayout)
+        layout.addLayout(leftLayout)
+        layout.addLayout(rightLayout)
+        layout.setStretchFactor(leftLayout, 1)
+        layout.setStretchFactor(rightLayout, 0)
+
+        self.setLayout(layout)
+
+    def stock_give(self):
+        self.fig.clear()
+        a=0
+        now = stock.get_nearest_business_day_in_a_week(datetime.today().strftime("%Y%m%d"), prev=True)
+        kospi = stock.get_market_fundamental(date=now,market="KOSPI")
+        kosdaq = stock.get_market_fundamental(date=now, market="KOSDAQ")
+        df = pd.concat([kospi,kosdaq])
+
+        per = df[df['PER']==0].index
+        data = df.drop(per)[['PER','PBR']]
+
+        data.loc[:, 'score1'] = data.loc[:, 'PER'].rank(axis=0, method='min', ascending=True)
+        data.loc[:, 'score2'] = data.loc[:, 'PBR'].rank(axis=0, method='min', ascending=True)
+        data.loc[:, 'price'] = data.loc[:, 'score1'] + data.loc[:, 'score2']
+
+        data = data.sort_values(by=['price'], ascending=True, ignore_index=False, inplace=False).head(100)
+        
+        stocks = []
+        ratio = []
+        cap_total = 0
+        while a < 100:
+            cap = stock.get_market_cap(now, now, data.index[a])
+            if int(cap['시가총액']) > 200000000000:
+                stocks.append(stock.get_market_ticker_name(data.index[a]))
+                cap_total = cap_total + int(cap['시가총액'])
+                ratio.append(int(cap['시가총액'])*100)
+            if len(ratio)>=13:
+                break
+            a=a+1
+        buy_ratio = [int(ratio[i]/cap_total) for i in range(len(ratio))]
+        self.stockname.setText(str(stocks[0])+" 매수 "+str(buy_ratio[0])+"%")
+        self.stocksector.setText(str(stocks[1])+" 매수 "+str(buy_ratio[1])+"%")
+        self.stockindustry.setText(str(stocks[2])+" 매수 "+str(buy_ratio[2])+"%")
+        self.stockprice.setText(str(stocks[3])+" 매수 "+str(buy_ratio[3])+"%")  
+        self.stockchigh.setText(str(stocks[4])+" 매수 "+str(buy_ratio[4])+"%")
+        self.stocklow.setText(str(stocks[5])+" 매수 "+str(buy_ratio[5])+"%")
+        self.stocksiga.setText(str(stocks[6])+" 매수 "+str(buy_ratio[6])+"%")
+        self.stockmachul.setText(str(stocks[7])+" 매수 "+str(buy_ratio[7])+"%")
+        self.stockyoungup.setText(str(stocks[8])+" 매수 "+str(buy_ratio[8])+"%")
+        self.per.setText(str(stocks[9])+" 매수 "+str(buy_ratio[9])+"%")
+        self.eps.setText(str(stocks[10])+" 매수 "+str(buy_ratio[10])+"%")
+        self.pbr.setText(str(stocks[11])+" 매수 "+str(buy_ratio[11])+"%")
+        self.bps.setText(str(stocks[12])+" 매수 "+str(buy_ratio[12])+"%")
+
+    def crawling(self):
+        try:
+            self.fig.clear()
+            search = self.news.text()
+            news_title = []
+            url = []
+            url.append("https://search.naver.com/search.naver?where=news&sm=tab_pge&query=" + search + "&start=" + str(1))
+            url.append("https://search.naver.com/search.naver?where=news&sm=tab_pge&query=" + search + "&start=" + str(11))
+            url.append("https://search.naver.com/search.naver?where=news&sm=tab_pge&query=" + search + "&start=" + str(21))
+            a=0
+            while a < 3:
+                headers = { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/100.0.48496.75" }
+                original_html = requests.get(url[a], headers=headers)
+                html = BeautifulSoup(original_html.text, "html.parser")
+                articles = html.select("div.group_news > ul.list_news > li div.news_area > a")
+                for i in articles:
+                    news_title.append(i.attrs['title'])
+                a=a+1
+            self.stockname.setText(news_title[0]+"   |   "+news_title[1])
+            self.stocksector.setText(news_title[2]+"   |   "+news_title[3])
+            self.stockindustry.setText(news_title[4]+"   |   "+news_title[5])
+            self.stockprice.setText(news_title[6]+"   |   "+news_title[7])
+            self.stockchigh.setText(news_title[8]+"   |   "+news_title[9])
+            self.stocklow.setText(news_title[10]+"   |   "+news_title[11])
+            self.stocksiga.setText(news_title[12]+"   |   "+news_title[13])
+            self.stockmachul.setText(news_title[14]+"   |   "+news_title[15])
+            self.stockyoungup.setText(news_title[16]+"   |   "+news_title[17])
+            self.per.setText(news_title[18]+"   |   "+news_title[19])
+            self.eps.setText(news_title[20]+"   |   "+news_title[21])
+            self.pbr.setText(news_title[22]+"   |   "+news_title[23])
+            self.bps.setText(news_title[24]+"   |   "+news_title[25])
+        except Exception as e:
+            self.stockname.setText("검색 표본 부족")
+            self.stocksector.setText(str(e))
+            self.stockindustry.setText(" ")
+            self.stockprice.setText(" ")            
+            self.stockchigh.setText(" ")
+            self.stocklow.setText(" ")
+            self.stocksiga.setText(" ")
+            self.stockmachul.setText(" ")
+            self.stockyoungup.setText(" ")
+            self.per.setText(" ")
+            self.eps.setText(" ")
+            self.pbr.setText(" ")
+            self.bps.setText(" ")
+
+    def calindar_a(self):
+        try:
+            self.fig.clear()
+            a=[]
+            b=[]
+            c=[]
+            news_title = pd.DataFrame({'time':[],'country':[],'title':[]})
+            url = "https://kr.investing.com/economic-calendar/"
+            headers = { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/100.0.48496.75" }
+            original_html = requests.get(url, headers=headers)
+            html = BeautifulSoup(original_html.text, "html.parser")
+            title = html.select("td.left.event > a")
+            time = html.select("td.first.left.time.js-time")
+            country = html.select("td.left.flagCur.noWrap")
+            for x in time:
+                a.append(str(x.get_text()))
+            for x in country:
+                b.append(str(x.get_text()))
+            for x in title:
+                c.append(str(x.get_text()))
+            x = 0
+            while x < len(a):
+                if a[x] == "잠정적인":
+                    pass
+                elif int(a[x][0:2]) > int(datetime.today().hour):
+                    break
+                x=x+1
+            news_title['time'] = a[x:]
+            news_title['country'] = b[x:]
+            news_title['title'] = c[x:]
+            x = 0
+            price = []
+            while x < len(news_title['time']):
+                k = (str(news_title.iloc[x]['time'])+str(news_title.iloc[x]['country'])+" "+str(news_title.iloc[x]['title'])).replace("\n", "")
+                price.append(k)
+                x=x+1
+            x = 0
+            if len(price)==0:
+                price.append("당일 일정이 없습니다")
+            lenth = 26-len(price)
+            while x < lenth:
+                price.append(" ")
+                x=x+1
+            self.fig.clear()
+            self.stockname.setText(price[0]+"  |  "+price[13])
+            self.stocksector.setText(price[1]+"  |  "+price[14])
+            self.stockindustry.setText(price[2]+"  |  "+price[15])
+            self.stockprice.setText(price[3]+"  |  "+price[16])
+            self.stockchigh.setText(price[4]+"  |  "+price[17])
+            self.stocklow.setText(price[5]+"  |  "+price[18])
+            self.stocksiga.setText(price[6]+"  |  "+price[19])
+            self.stockmachul.setText(price[7]+"  |  "+price[20])
+            self.stockyoungup.setText(price[8]+"  |  "+price[21])
+            self.per.setText(price[9]+"  |  "+price[22])
+            self.eps.setText(price[10]+"  |  "+price[23])
+            self.pbr.setText(price[11]+"  |  "+price[24])
+            self.bps.setText(price[12]+"  |  "+price[25])
+        except Exception as e:
+            self.stockname.setText(str(e))
+            self.stocksector.setText(" ")
+            self.stockindustry.setText(" ")
+            self.stockprice.setText(" ")            
+            self.stockchigh.setText(" ")
+            self.stocklow.setText(" ")
+            self.stocksiga.setText(" ")
+            self.stockmachul.setText(" ")
+            self.stockyoungup.setText(" ")
+            self.per.setText(" ")
+            self.eps.setText(" ")
+            self.pbr.setText(" ")
+            self.bps.setText(" ")
+    
+    def market_open(self):
+        try:
+            self.fig.clear()
+            start = datetime.today()
+            end = start + timedelta(days=20)
+            df = ecals.get_calendar("NYSE", start=start.date(), end=end.date(), side = "left")
+            format = '%Y-%m-%d %H:%M:%S'
+
+            dt_datetime = []
+            a = 0
+            while a < len(df.schedule):
+                open_time = str(datetime.strptime(str(df.schedule.iloc[a]['open'])[:-6],format) + timedelta(hours=9))
+                end_time = str(datetime.strptime(str(df.schedule.iloc[a]['close'])[:-6],format) + timedelta(hours=9))
+                dt_datetime.append(str("개장시간 : "+open_time+"       폐장시간 : "+end_time))
+                a=a+1
+            self.stockname.setText("------당일------")
+            self.stocksector.setText(str(dt_datetime[0]))
+            self.stockindustry.setText("  ")
+            self.stockprice.setText(str(dt_datetime[1]))            
+            self.stockchigh.setText(str(dt_datetime[2])) 
+            self.stocklow.setText(str(dt_datetime[3])) 
+            self.stocksiga.setText(str(dt_datetime[4])) 
+            self.stockmachul.setText(str(dt_datetime[5])) 
+            self.stockyoungup.setText(str(dt_datetime[6])) 
+            self.per.setText(str(dt_datetime[7])) 
+            self.eps.setText(str(dt_datetime[8])) 
+            self.pbr.setText(str(dt_datetime[9])) 
+            self.bps.setText(str(dt_datetime[10])) 
+        except Exception as e:
+            self.stockname.setText(str(e))
+            self.stocksector.setText(" ")
+            self.stockindustry.setText(" ")
+            self.stockprice.setText(" ")            
+            self.stockchigh.setText(" ")
+            self.stocklow.setText(" ")
+            self.stocksiga.setText(" ")
+            self.stockmachul.setText(" ")
+            self.stockyoungup.setText(" ")
+            self.per.setText(" ")
+            self.eps.setText(" ")
+            self.pbr.setText(" ")
+            self.bps.setText(" ")
+
+    def kimchi_pre(self):
+        try:
+            self.fig.clear()
+            items = {"비트코인","이더리움","리플"}
+            x, ok = QInputDialog.getItem(self, "김프 차트", "김프 차트", items)
+            num, ok = QInputDialog.getInt(self, '김프 차트', '조회일수', 100, max=900)
+            if x == "비트코인":
+                ticker_k = "KRW-BTC"
+                ticker_u = "BTC/BUSD"
+            elif x == "이더리움":
+                ticker_k = "KRW-ETH"
+                ticker_u = "ETH/BUSD"
+            elif x == "리플":
+                ticker_k = "KRW-XRP"
+                ticker_u = "XRP/BUSD"
+            #btc-krw / (btc-usd * 환율)
+            binance = ccxt.binance()
+            btc_ohlcv = binance.fetch_ohlcv(symbol=ticker_u, timeframe="1d", limit=num)
+            bu = pd.DataFrame(btc_ohlcv, columns=['datetime', 'open', 'high', 'low', 'close', 'volume'])
+            bu['datetime'] = pd.to_datetime(bu['datetime'], unit='ms')
+            bu.set_index('datetime', inplace=True)
+            bk = pyupbit.get_ohlcv(ticker_k, interval = "day", count=num)
+            start_time = (datetime.today() - timedelta(days=1460)).strftime("%Y-%m-%d")
+            fx = yf.download(['USDKRW=X'], start_time)
+            fx = fx[0:num]
+            x=0
+            kp = pd.DataFrame(index = bu.index, columns=['kp'])
+            while x<num:
+                kp.iloc[x]['kp'] = float(bk.iloc[x]['close'])/(float(bu.iloc[x]['close'])*float(fx.iloc[x]['Close']))
+                x=x+1
+            base = bk['close'] / ((np.max(bk['close']) - np.min(bk['close']))) * (np.max(kp['kp']) - np.min(kp['kp']))
+            base = base - np.min(base) + np.min(kp['kp'])
+            tt = (kp.iloc[-1]['kp']/kp.iloc[-2]['kp']-1)*100
+            ax = self.fig.add_subplot(111)
+            ax.plot(kp.index, kp['kp'], label="korean premium")
+            ax.plot(kp.index, base, label="coin price")
+            ax.legend(loc='upper right')
+            ax.grid()
+            self.canvas.draw()
+            self.stockname.setText("현재가 : "+str(bk.iloc[-1]['close'])+"원")
+            self.stocksector.setText(str(bu.iloc[-1]['close'])+"$")
+            self.stockindustry.setText("김프 : "+str(kp.iloc[-1]['kp'])+"%")
+            self.stockprice.setText("김프 전일대비 변동률 : "+str(round(tt,4))+"%")          
+            self.stockchigh.setText(" ")
+            self.stocklow.setText(" ")
+            self.stocksiga.setText(" ")
+            self.stockmachul.setText(" ")
+            self.stockyoungup.setText(" ")
+            self.per.setText(" ")
+            self.eps.setText(" ")
+            self.pbr.setText(" ")
+            self.bps.setText(" ")
+        except Exception as e:
+            self.stockname.setText(str(e))
+            self.stocksector.setText(" ")
+            self.stockindustry.setText(" ")
+            self.stockprice.setText(" ")            
+            self.stockchigh.setText(" ")
+            self.stocklow.setText(" ")
+            self.stocksiga.setText(" ")
+            self.stockmachul.setText(" ")
+            self.stockyoungup.setText(" ")
+            self.per.setText(" ")
+            self.eps.setText(" ")
+            self.pbr.setText(" ")
+            self.bps.setText(" ")
+    
+    def find_practal(self):
+        try:
+            self.fig.clear()
+            self.stockname.setText("")
+            self.stocksector.setText("data analysis")
+            self.stockindustry.setText(" ")
+            self.stockprice.setText(" ")            
+            self.stockchigh.setText(" ")
+            self.stocklow.setText(" ")
+            self.stocksiga.setText(" ")
+            self.stockmachul.setText(" ")
+            self.stockyoungup.setText(" ")
+            self.per.setText(" ")
+            self.eps.setText(" ")
+            self.pbr.setText(" ")
+            self.bps.setText(" ")
+
+            items = {"1h","4h","1d"}
+            dt, ok = QInputDialog.getItem(self, "캔들 종류", "캔들 종류", items)
+            roop, ok = QInputDialog.getInt(self, '조회횟수', '조회횟수', 1, max=20)
+
+            binance = ccxt.binance()
+            result = pd.DataFrame(columns=['datetime', 'open', 'high', 'low', 'close', 'volume'])
+
+            if dt == "1d":
+                x = 1
+                timethoushand = 24000
+                mul = 24
+            elif dt == "4h":
+                x = 6
+                timethoushand = 4000
+                mul=4
+            else:
+                x = 25
+                timethoushand = 1000
+                mul=1
+
+            num = 1
+            while x > 0:
+                now = datetime.today() - timedelta(hours=timethoushand*x)
+                since = round(now.timestamp()*1000)
+
+                btc = binance.fetch_ohlcv(symbol="BTC/USDT", timeframe=dt, since=since, limit=1000)
+                data = pd.DataFrame(btc, columns=['datetime', 'open', 'high', 'low', 'close', 'volume'])
+                data['datetime'] = pd.to_datetime(data['datetime'], unit='ms')
+                data.set_index('datetime', inplace=True)
+                x = x-1
+                result = pd.concat([result, data])
+
+            result = result.drop(['datetime'], axis='columns')
+            
+            btc_ohlcv = binance.fetch_ohlcv(symbol="BTC/USDT", timeframe=dt, limit=101)
+            com = pd.DataFrame(btc_ohlcv, columns=['datetime', 'open', 'high', 'low', 'close', 'volume'])
+            com['datetime'] = pd.to_datetime(com['datetime'], unit='ms')
+            com.set_index('datetime', inplace=True)
+            close = com['close']
+            close = close[:100]
+
+            base = (close - np.min(close)) / (np.max(close) - np.min(close))
+            w = len(base)
+            move = len(result) - w - 101
+            sim = []
+            for i in range(move):
+                t = result.iloc[i:i+w]['close']
+                base2 = (t - np.min(t)) / (np.max(t) - np.min(t))
+                a = np.dot(base, base2) / (np.sqrt(np.dot(base, base)) * np.sqrt(np.dot(base2, base2)))
+                sim.append(a)
+                self.stockname.setText(str(num))
+                self.stockname.repaint()
+                num = num + 1
+            ser = pd.Series(sim).sort_values(ascending=False).head(20)
+
+            counta = 0
+            while counta < roop:
+                i = ser.index[counta]
+                chart = result.iloc[i:i+200]
+                    
+                df = chart
+                date_name = (df.index[0] + timedelta(hours=100*mul)).strftime("%Y-%m-%d %Hh")
+
+                s = mpf.make_mpf_style(base_mpf_style='yahoo')
+                mpf.plot(df, type='candle', mav=(20), volume=True, title=date_name, figratio=(10,6), vlines=dict(vlines=date_name, linewidths=0.1), style=s)
+                plt.show()
+                counta = counta + 1
+        except Exception as e:
+            self.stockname.setText(str(e))
+            self.stocksector.setText(" ")
+            self.stockindustry.setText(" ")
+            self.stockprice.setText(" ")            
+            self.stockchigh.setText(" ")
+            self.stocklow.setText(" ")
+            self.stocksiga.setText(" ")
+            self.stockmachul.setText(" ")
+            self.stockyoungup.setText(" ")
+            self.per.setText(" ")
+            self.eps.setText(" ")
+            self.pbr.setText(" ")
+            self.bps.setText(" ")
+
+    def fibonacci(self):
+        try:
+            self.fig.clear()
+            self.stockname.setText("1INCH, AAVE, ADA/BUSD, ADA, ALGO, ALICE, ALPHA, AMB/BUSD, ANC/BUSD, ANKR, ANT, APE/BUSD, APE, API3, AR")
+            self.stocksector.setText("ARPA, ATA, ATOM, AUDIO, AVAX, AXS, BAKE, BAL, BAND, BAT, BCH, BEL, BLZ")
+            self.stockindustry.setText("BNB, BNX, BTC, C98, CELO, CELR, CHR, CHZ, COMP, COTI")
+            self.stockprice.setText("CRV, CTK, CTSI, CVC, CVX, DAR, DASH, DEFI, DENT, DGB, DOGE")            
+            self.stockchigh.setText("DOT, DUSK, DYDX, EGLD, ENJ, ENS, EOS, ETC, ETH, FIL, FLM")
+            self.stocklow.setText("FLOW, FOOTBALL, FTM, FTT, GAL, GALA, GMT, GRT, GTC, HBAR")
+            self.stocksiga.setText("HNT, HOT, ICP, ICX, IMX, INJ, IOST, IOTA, IOTX, JASMY, KAVA, KLAY, KNC, KSM")
+            self.stockmachul.setText("LDO, LINA, LINK, LIT, LPT, LRC, LTC, LUNA2, MANA, MASK")
+            self.stockyoungup.setText("MATIC, MKR, MTL, NEAR, NEO, NKN, OCEAN, OGN, OMG, ONE, ONT, OP, PEOPLE")
+            self.per.setText("QTUM, RAY, REEF, REN, RLC, ROSE, RSR, RUNE, RVN, SAND, SC, SFP, SKL")
+            self.eps.setText("SNX, SOL, SPELL, SRM, STG, STMX, STORJ, SUSHI, SXP, THETA, TLM, TOMO, TRB")
+            self.pbr.setText("TRX, UNFI, UNI, VET, WAVES, WOO, XEM, XLM, XMR, XRP, XTZ")
+            self.bps.setText("YFI, ZEC, ZEN, ZIL")
+
+            text, ok = QInputDialog.getText(self, "티커명", "티커명 : ")
+            items = {"15m","1h","4h","1d"}
+            tf, ok = QInputDialog.getItem(self, "캔들 종류", "캔들 종류", items)
+            count, ok = QInputDialog.getInt(self, '조회횟수', '조회횟수', 100, min=50, max=1000)
+            def myRSI(price, n=14):
+                delta = price['close'].diff()
+                dUp, dDown = delta.copy(), delta.copy()
+                dUp[dUp < 0] = 0
+                dDown[dDown > 0] = 0
+
+                RolUp = dUp.rolling(window=n).mean()
+                RolDown = dDown.rolling(window=n).mean().abs()
+                
+                RS = RolUp / RolDown
+                rsi= 100.0 - (100.0 / (1.0 + RS))
+                return rsi
+
+            def pivotid(df1, l, n1, n2): #n1 n2 before and after candle l
+                if l-n1 < 0 or l+n2 >= len(df1):
+                    return 0
+                
+                pividlow=1
+                pividhigh=1
+                for i in range(l-n1, l+n2+1):
+                    if(df1.low[l]>df1.low[i]):
+                        pividlow=0
+                    if(df1.high[l]<df1.high[i]):
+                        pividhigh=0
+                if pividlow and pividhigh:
+                    return 3
+                elif pividlow:
+                    return 1
+                elif pividhigh:
+                    return 2
+                else:
+                    return 0
+
+            def RSIpivotid(df1, l, n1, n2): #n1 n2 before and after candle l
+                if l-n1 < 0 or l+n2 >= len(df1):
+                    return 0
+
+                pividlow=1
+                pividhigh=1
+                for i in range(l-n1, l+n2+1):
+                    if(df1.RSI[l]>df1.RSI[i]):
+                        pividlow=0
+                    if(df1.RSI[l]<df1.RSI[i]):
+                        pividhigh=0
+                if pividlow and pividhigh:
+                    return 3
+                elif pividlow:
+                    return 1
+                elif pividhigh:
+                    return 2
+                else:
+                    return 0 
+
+            def pointpos(x):
+                if x['pivot']==1:
+                    return x['low']-1e-3
+                elif x['pivot']==2:
+                    return x['high']+1e-3
+                else:
+                    return np.nan
+
+            def RSIpointpos(x):
+                if x['RSIpivot']==1:
+                    return x['RSI']-1
+                elif x['RSIpivot']==2:
+                    return x['RSI']+1
+                else:
+                    return np.nan
+
+            def divsignal2(x, nbackcandles):
+                backcandles=nbackcandles 
+                candleid = int(x.name)
+
+                closp = np.array([])
+                xxclos = np.array([])
+                
+                maxim = np.array([])
+                minim = np.array([])
+
+                maximRSI = np.array([])
+                minimRSI = np.array([])
+
+                for i in range(candleid-backcandles, candleid+1):
+                    closp = np.append(closp, df.iloc[i].close)
+                    xxclos = np.append(xxclos, i)
+                    if df.iloc[i].pivot == 1:
+                        minim = np.append(minim, df.iloc[i].low)
+                    if df.iloc[i].pivot == 2:
+                        maxim = np.append(maxim, df.iloc[i].high)
+                    if df.iloc[i].RSIpivot == 1:
+                        minimRSI = np.append(minimRSI, df.iloc[i].RSI)
+                    if df.iloc[i].RSIpivot == 2:
+                        maximRSI = np.append(maximRSI, df.iloc[i].RSI)
+
+                slclos, interclos = np.polyfit(xxclos, closp,1)
+                
+                if slclos > 1e-4 and (maximRSI.size<2 or maxim.size<2):
+                    return 0
+                if slclos < -1e-4 and (minimRSI.size<2 or minim.size<2):
+                    return 0
+            # signal decisions here !!!
+                if slclos > 1e-4:
+                    if maximRSI[-1]<maximRSI[-2] and maxim[-1]>maxim[-2]:
+                        return 1
+                elif slclos < -1e-4:
+                    if minimRSI[-1]>minimRSI[-2] and minim[-1]<minim[-2]:
+                        return 2
+                else:
+                    return 0
+
+            binance = ccxt.binance()
+            symbol = text.upper() + str("/USDT")
+            btc = binance.fetch_ohlcv(symbol=symbol, timeframe=tf, limit=count)
+            df = pd.DataFrame(btc, columns=['datetime', 'open', 'high', 'low', 'close', 'volume'])
+            df['datetime'] = pd.to_datetime(df['datetime'], unit='ms')
+            df.set_index('datetime', inplace=True)
+
+            df['RSI'] = myRSI(df)
+            df.dropna(inplace=True)
+            df.reset_index(drop=True, inplace=True)
+            df.isna().sum()
+
+            df['pivot'] = df.apply(lambda x: pivotid(df, x.name,3,3), axis=1)
+            df['RSIpivot'] = df.apply(lambda x: RSIpivotid(df, x.name,3,3), axis=1)
+
+            df['pointpos'] = df.apply(lambda row: pointpos(row), axis=1)
+            df['RSIpointpos'] = df.apply(lambda row: RSIpointpos(row), axis=1)
+
+            df['divSignal2'] = df.apply(lambda row: divsignal2(row,30), axis=1)
+            df['divSignal2'] = df['divSignal2'] * df['RSI']
+
+            fig = make_subplots(rows=2, cols=1)
+            fig.append_trace(go.Candlestick(x=df.index, open=df['open'], high=df['high'], low=df['low'], close=df['close'], name=str(symbol)), row=1, col=1)
+            fig.add_scatter(x=df.index, y=df['pointpos'], mode="markers", marker=dict(size=6, color="black"), name="Pivot Point", row=1, col=1)
+
+            fig.append_trace(go.Scatter(x=df.index, y=df['RSI'], name='RSI'), row=2, col=1)
+            fig.add_scatter(x=df.index, y=df['RSIpointpos'], mode="markers", marker=dict(size=6, color="black"), name="RSI Pivot", row=2, col=1)
+            fig.add_scatter(x=df.index, y=df['divSignal2'], mode="markers", marker=dict(size=6, color="red"), name="SIGNAL", row=2, col=1)
+
+            fig.update_layout(xaxis_rangeslider_visible=False, title="RSI < Signal = 롱, RSI = Signal = 숏, RSI > Signal = 무포지션")
+            fig.show()
+        except Exception as e:
+            self.stockname.setText(str(e))
+            self.stocksector.setText(" ")
+            self.stockindustry.setText(" ")
+            self.stockprice.setText(" ")            
+            self.stockchigh.setText(" ")
+            self.stocklow.setText(" ")
+            self.stocksiga.setText(" ")
+            self.stockmachul.setText(" ")
+            self.stockyoungup.setText(" ")
+            self.per.setText(" ")
+            self.eps.setText(" ")
+            self.pbr.setText(" ")
+            self.bps.setText(" ")
+
+    def tri(self):
+        try:
+            self.fig.clear()
+            def pivotid(df1, l, n1, n2): #n1 n2 before and after candle l
+                if l-n1 < 0 or l+n2 >= len(df1):
+                    return 0
+    
+                pividlow=1
+                pividhigh=1
+                for i in range(l-n1, l+n2+1):
+                    if(df1.low[l]>df1.low[i]):
+                        pividlow=0
+                    if(df1.high[l]<df1.high[i]):
+                        pividhigh=0
+                if pividlow and pividhigh:
+                    return 3
+                elif pividlow:
+                    return 1
+                elif pividhigh:
+                    return 2
+                else:
+                    return 0
+                
+            def pointpos(x):
+                if x['pivot']==1:
+                    return x['low']-1e-3
+                elif x['pivot']==2:
+                    return x['high']+1e-3
+                else:
+                    return np.nan
+
+            binance = ccxt.binance()
+
+            items = {"1m","5m","15m","1h","4h","1d"}
+            tf, ok = QInputDialog.getItem(self, "캔들 종류", "캔들 종류", items)
+            limit, ok = QInputDialog.getInt(self, '조회횟수', '조회횟수', 100, min=50, max=300)
+            coin = ['BTC/USDT', 'ETH/USDT', 'XRP/USDT', 'LINK/USDT', 'LTC/USDT', 'SOL/USDT', 'BCH/USDT', 'ETC/USDT', 'EOS/USDT', 'DOT/USDT', 'UNI/USDT', 'FIL/USDT', 'AAVE/USDT', 'NEAR/USDT', 'ATOM/USDT',
+            'AVAX/USDT', 'APE/USDT', 'BNB/USDT', 'ENS/USDT', 'GAL/USDT', 'GMT/USDT', 'LUNA2/USDT']
+            stop = False
+            for symbol in coin:
+                btc = binance.fetch_ohlcv(symbol=symbol, timeframe=tf, limit=limit)
+                df = pd.DataFrame(btc, columns=['datetime', 'open', 'high', 'low', 'close', 'volume'])
+                df['datetime'] = pd.to_datetime(df['datetime'], unit='ms')
+                df.set_index('datetime', inplace=True)
+                df.dropna(inplace=True)
+                df.reset_index(drop=True, inplace=True)
+                df.isna().sum()
+
+                df['pivot'] = df.apply(lambda x: pivotid(df, x.name,3,3), axis=1)
+                df['pointpos'] = df.apply(lambda row: pointpos(row), axis=1)
+
+                backcandles = 20
+                candleid = limit-2
+
+                maxim = np.array([])
+                minim = np.array([])
+                xxmin = np.array([])
+                xxmax = np.array([])
+
+                for i in range(candleid-backcandles, candleid+1):
+                    if df.iloc[i].pivot == 1:
+                        minim = np.append(minim, df.iloc[i].low)
+                        xxmin = np.append(xxmin, i)
+                    if df.iloc[i].pivot == 2:
+                        maxim = np.append(maxim, df.iloc[i].high)
+                        xxmax = np.append(xxmax, i)
+                if len(xxmin)*len(minim)*len(xxmax)*len(maxim)==0:
+                    continue
+                else:
+                    slmin, intercmin, rmin, pmin, semin = linregress(xxmin, minim)
+                    slmax, intercmax, rmax, pmax, semax = linregress(xxmax, maxim)
+
+                    xxmin = np.append(xxmin, xxmin[-1]+15)
+                    xxmax = np.append(xxmax, xxmax[-1]+15)
+
+                    if np.isnan(slmin) or np.isnan(intercmin) or np.isnan(slmax) or np.isnan(intercmax) == True:
+                        self.stockname.setText(str(symbol))
+                        self.stockname.repaint()
+                    else:
+                        stop = True
+                        break
+            if stop == True:
+                fig = go.Figure(data=[go.Candlestick(x=df.index, open=df['open'], high=df['high'], low=df['low'], close=df['close'], name=(str(symbol)+"--"+str(tf)))])
+                fig.add_scatter(x=df.index, y=df['pointpos'], mode="markers", marker=dict(size=6, color="black"), name="pivot")
+                fig.add_trace(go.Scatter(x=xxmin, y=slmin*xxmin + intercmin, mode='lines', name='min slope'))
+                fig.add_trace(go.Scatter(x=xxmax, y=slmax*xxmax + intercmax, mode='lines', name='max slope'))
+                fig.update_layout(xaxis_rangeslider_visible=False)
+                fig.show()
+            else:
+                self.stockname.setText("전체 삼각수렴 없음 : ")
+                self.stockname.repaint()
+        except Exception as e:
+            self.stockname.setText(str(e))
+            self.stocksector.setText(" ")
+            self.stockindustry.setText(" ")
+            self.stockprice.setText(" ")            
+            self.stockchigh.setText(" ")
+            self.stocklow.setText(" ")
+            self.stocksiga.setText(" ")
+            self.stockmachul.setText(" ")
+            self.stockyoungup.setText(" ")
+            self.per.setText(" ")
+            self.eps.setText(" ")
+            self.pbr.setText(" ")
+            self.bps.setText(" ")
+
+    def traiding_view(self):
+        url = "https://kr.tradingview.com/chart/?symbol=BTCUSDT"
+        webbrowser.open(url)
+
+    def exit_program(self):
+        sys.exit()
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = MyWindow()
+    window.show()
+    app.exec_()
